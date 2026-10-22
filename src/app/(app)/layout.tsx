@@ -3,7 +3,7 @@ import { getSessionUser } from "@/lib/auth";
 import { getSearchIndex } from "@/lib/queries";
 
 /** Invest Portal — trang ứng dụng (Finder, Insight, Listing, Saved…). */
-export default async function InvestAppLayout({ children }: { children: React.ReactNode }) {
+export default async function InvestAppLayout({ children }: LayoutProps<"/">) {
   const [user, searchEntries] = await Promise.all([getSessionUser(), getSearchIndex()]);
   return (
     <PortalShell portal="invest" user={user} searchEntries={searchEntries}>

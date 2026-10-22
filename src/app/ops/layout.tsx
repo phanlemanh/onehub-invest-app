@@ -17,7 +17,7 @@ export const metadata: Metadata = {
  * (session còn hạn + quyền). Shell tạm dùng chung PortalShell với cấu hình
  * nav "ops" — đổi sang @reui/app-shell-26 khi có trang ops thật.
  */
-export default async function OpsLayout({ children }: { children: React.ReactNode }) {
+export default async function OpsLayout({ children }: LayoutProps<"/ops">) {
   const user = await getSessionUser();
   if (!user) redirect("/login?next=/ops");
   if (!canAccessOps(user)) notFound();

@@ -4,6 +4,7 @@ import { getSessionUser } from "@/lib/auth";
 import { canAccessOps } from "@/lib/ops-access";
 import {
   getFlowDays,
+  getZaloAccountsFromFacts,
   getZaloGroups,
   readGateFunnel,
   readRotationPreview,
@@ -33,7 +34,7 @@ export async function GET(req: Request) {
     90,
     Math.max(1, Number(new URL(req.url).searchParams.get("days") ?? 7) || 7),
   );
-  const [flow, funnel, jobs, rotation, zaloGroups, zaloAllowlist, zaloHealth] = await Promise.all([
+  const [flow, funnel, jobs, rotation, zaloGroups, zaloAllowlist, zaloHealth, zaloAccounts] = await Promise.all([
     getFlowDays(days),
     readGateFunnel(),
     readSchedulerStatus(),
@@ -41,6 +42,7 @@ export async function GET(req: Request) {
     getZaloGroups(),
     readZaloAllowlist(),
     readZaloHealth(),
+    getZaloAccountsFromFacts(),
   ]);
   return NextResponse.json({
     generatedAt: new Date().toISOString(),
@@ -51,5 +53,6 @@ export async function GET(req: Request) {
     zaloGroups,
     zaloAllowlist,
     zaloHealth,
+    zaloAccounts,
   });
 }

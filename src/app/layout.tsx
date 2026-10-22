@@ -19,7 +19,7 @@ export const metadata: Metadata = {
   description: "Số liệu đầu tư bất động sản cho thuê ngắn hạn theo thị trường",
 };
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html
       lang="vi"

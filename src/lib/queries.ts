@@ -1110,13 +1110,15 @@ export async function getAirdnaComparison(areaId: string): Promise<AirdnaCompari
   };
 }
 
-/** Độ tươi dữ liệu thị trường cho footer Insight (DQO — ADR-0007). */
+/** Độ tươi dữ liệu thị trường cho footer Insight (DQO — ADR-0007).
+ * Cloud KHÔNG có source_registry (bảng tầng A — leak gate cấm, đã drop
+ * 2026-10-21): fallback bỏ subquery lọc nguồn; trên cloud airbnb_snapshots
+ * trống nên kết quả vô nghĩa ở đó dù lọc thế nào. */
 export async function getMarketFreshness(
   areaId: string,
 ): Promise<{ lastSnapshotAt: string | null; listingCount: number }> {
   const city = areaId.split("-").slice(0, 2).join("-").split("-")[1] ?? areaId;
-  const { rows } = await pool.query(
-    `WITH l AS (
+  const base = `WITH l AS (
        SELECT count(*)::int AS n FROM listings
        WHERE area_id = $1 OR area_id LIKE $1 || '-%'
      ), s AS (
@@ -1124,8 +1126,19 @@ export async function getMarketFreshness(
        WHERE city = $2
          AND source IN (SELECT unnest(source_ids) FROM source_registry WHERE code = 'S01')
      )
-     SELECT l.n, s.last FROM l, s`,
-    [areaId, city],
-  );
+     SELECT l.n, s.last FROM l, s`;
+  const fallback = `WITH l AS (
+       SELECT count(*)::int AS n FROM listings
+       WHERE area_id = $1 OR area_id LIKE $1 || '-%'
+     ), s AS (
+       SELECT max(collected_at)::text AS last FROM airbnb_snapshots WHERE city = $2
+     )
+     SELECT l.n, s.last FROM l, s`;
+  let rows;
+  try {
+    ({ rows } = await pool.query(base, [areaId, city]));
+  } catch {
+    ({ rows } = await pool.query(fallback, [areaId, city]));
+  }
   return { lastSnapshotAt: rows[0]?.last ?? null, listingCount: rows[0]?.n ?? 0 };
 }

@@ -21,28 +21,41 @@ function confBadge(c: string) {
   return <Badge variant="warning-light">thấp</Badge>;
 }
 
+function sourceBadge(s: string) {
+  if (s === "S03") return <Badge variant="outline">Zalo</Badge>;
+  if (s === "S05") return <Badge variant="outline">Facebook</Badge>;
+  return <Badge variant="outline">{s}</Badge>;
+}
+
+function fmtPhone(p: string) {
+  // 0973034567 → 0973 034 567 — dễ đọc khi gọi
+  return p.replace(/^(\d{4})(\d{3})(\d{3})$/, "$1 $2 $3");
+}
+
 /**
- * /deals — G2: căn giá tốt nhất từ nguồn cộng đồng (price/m² thấp hơn median
- * phường). Liên hệ người đăng (PII) chỉ hiển thị ở máy local — trên cloud
- * stg_zalo_posts rỗng nên cột tự thiếu, đúng thiết kế tầng A.
+ * /deals — P4: căn giá tốt từ tín hiệu riêng (P1: Zalo/Facebook) đo bằng
+ * thước vải công khai (P2: median Chợ Tốt cùng phường). SĐT người bán là
+ * PII tầng A — bảng sale_offers không sync cloud nên chỉ máy local có.
  */
 export default async function DealsPage() {
   const rows = await getDeals(30, 5);
-  const hasContact = rows.some((r) => r.senderName);
+  const hasContact = rows.some((r) => r.sellerPhone);
 
   return (
     <div className="flex flex-col gap-4">
       <div className="flex flex-col gap-1.5">
         <h1 className="text-xl font-medium">Căn giá tốt</h1>
         <p className="text-muted-foreground text-xs">
-          Bán rẻ hơn median cùng phường (nguồn cộng đồng, 45 ngày gần nhất) —
-          sắp theo mức chiết khấu. {hasContact ? "" : "Thông tin người đăng chỉ có ở máy thu (stg local)."}
+          Tin nội bộ (Zalo/Facebook) rẻ hơn median rao công khai cùng phường
+          (thước Chợ Tốt, ≥5 tin/phường, 45 ngày gần nhất). {hasContact
+            ? "SĐT người đăng hiện sẵn — gọi xác minh giá thật."
+            : "Thông tin người đăng chỉ có ở máy thu (local)."}
         </p>
       </div>
       {rows.length === 0 ? (
         <p className="text-muted-foreground py-8 text-center text-sm">
-          Chưa có căn nào dưới ngưỡng 5% so với median phường — dữ liệu cộng
-          đồng đang tích luỹ.
+          Chưa có căn nào dưới ngưỡng 5% so với thước phường — vải công khai
+          đang tích luỹ (quét 05:30 hằng ngày).
         </p>
       ) : (
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
@@ -63,7 +76,8 @@ export default async function DealsPage() {
                   −{d.discountPct?.toFixed(0)}%
                 </Badge>
               </div>
-              <div className="flex items-center gap-2 text-xs">
+              <div className="flex flex-wrap items-center gap-2 text-xs">
+                {sourceBadge(d.source)}
                 <Link
                   prefetch={false}
                   href={d.areaPath ?? "/vn"}
@@ -72,32 +86,50 @@ export default async function DealsPage() {
                   {d.phuong ?? "—"}
                 </Link>
                 <span className="text-muted-foreground">
-                  median {d.medianPerm2 ? `${fmtInt(d.medianPerm2 / 1e6)}tr/m²` : "—"}
+                  thước {d.medianPerm2 ? `${fmtInt(d.medianPerm2 / 1e6)}tr/m²` : "—"}
+                  {d.rulerN ? ` (n=${d.rulerN})` : ""}
                 </span>
                 {confBadge(d.confidence)}
               </div>
-              {d.mediaPath && (
-                // eslint-disable-next-line @next/next/no-img-element -- local staging file
+              {(d.mediaPath || d.mediaUrl) && (
+                // eslint-disable-next-line @next/next/no-img-element -- Ảnh local (Zalo path) hoặc CDN (FB url)
                 <img
-                  src={`/api/zalo-media?path=${encodeURIComponent(d.mediaPath)}`}
+                  src={
+                    d.mediaPath
+                      ? `/api/zalo-media?path=${encodeURIComponent(d.mediaPath)}`
+                      : (d.mediaUrl ?? "")
+                  }
                   alt={`Ảnh tin bán — ${d.phuong ?? ""}`}
                   className="h-36 w-full rounded-md object-cover"
                   loading="lazy"
                 />
               )}
-              {d.senderName && (
-                <div className="flex items-center justify-between rounded-md bg-muted/50 px-2 py-1.5 text-xs">
-                  <div className="flex flex-col">
-                    <span className="font-medium">{d.senderName}</span>
-                    <span className="text-muted-foreground">{d.groupName}</span>
+              {(d.sellerPhone || d.sellerName) && (
+                <div className="flex items-center justify-between gap-2 rounded-md bg-muted/50 px-2 py-1.5 text-xs">
+                  <div className="flex min-w-0 flex-col">
+                    <span className="truncate font-medium">
+                      {d.sellerName ?? "Người đăng"}
+                      {d.brokerNAds && d.brokerNAds > 1 && (
+                        <span className="text-muted-foreground font-normal">
+                          {" "}· {d.brokerNAds} tin
+                          {d.brokerMedianGap !== null
+                            ? ` · gap giữa ${d.brokerMedianGap.toFixed(0)}%`
+                            : ""}
+                        </span>
+                      )}
+                    </span>
+                    <span className="text-muted-foreground truncate">
+                      {d.groupName}
+                    </span>
                   </div>
-                  <Link
-                    prefetch={false}
-                    href={`/vn?focus=${encodeURIComponent(d.offerId)}`}
-                    className="text-primary hover:underline"
-                  >
-                    Chi tiết ↗
-                  </Link>
+                  {d.sellerPhone && (
+                    <a
+                      href={`tel:${d.sellerPhone}`}
+                      className="shrink-0 rounded-md bg-primary px-2 py-1 font-medium text-primary-foreground"
+                    >
+                      ☎ {fmtPhone(d.sellerPhone)}
+                    </a>
+                  )}
                 </div>
               )}
               {d.postText && (

@@ -1,7 +1,7 @@
 "use client"
 
 import Link from "next/link"
-import { BookmarkCheckIcon, BookmarkIcon, GitCompareIcon, MapIcon } from "lucide-react"
+import { BookmarkCheckIcon, BookmarkIcon, CalculatorIcon, GitCompareIcon, MapIcon } from "lucide-react"
 
 import { toggleSaved } from "@/app/actions"
 import { Button } from "@/components/ui/button"
@@ -31,6 +31,16 @@ export function InsightActions({
       >
         <GitCompareIcon data-icon="inline-start" aria-hidden="true" />
         So sánh
+      </Button>
+      <Button
+        variant="outline"
+        size="sm"
+        className="text-xs shadow-xs"
+        nativeButton={false}
+        render={<Link href={`/${areaId.split("-")[0]}/${areaId.split("-").slice(1).join("-")}/dau-tu`} />}
+      >
+        <CalculatorIcon data-icon="inline-start" aria-hidden="true" />
+        Đầu tư
       </Button>
       {mapHref && (
         <Button

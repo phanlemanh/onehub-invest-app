@@ -136,7 +136,11 @@ export default async function ListingPage({ params }: { params: Params }) {
             // eslint-disable-next-line @next/next/no-img-element -- CDN Airbnb ngoài domain, kích thước động
             <img
               key={u}
-              src={`https://${u}?im_w=${i === 0 ? 1024 : 480}`}
+              // DB đã chuẩn hoá https:// từ backfill 2026-10-21; chỉ thêm
+              // scheme cho URL trần còn sót (tránh https://https:// đúp).
+              // Ảnh chính: aki_policy=x_large (im_w=1024 bị CDN 404 tùy ảnh);
+              // ảnh phụ im_w=480 luôn ổn định.
+              src={`${u.startsWith("http") ? u : `https://${u}`}${i === 0 ? "?aki_policy=x_large" : "?im_w=480"}`}
               alt={i === 0 ? `Ảnh chính — ${listing.name ?? listing.id}` : `Ảnh ${i + 1}`}
               className={`h-28 w-full rounded-md object-cover md:h-32 ${i === 0 ? "col-span-2 row-span-2 h-60 md:h-60" : ""}`}
               loading={i < 2 ? "eager" : "lazy"}

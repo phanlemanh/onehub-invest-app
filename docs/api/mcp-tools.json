@@ -1,0 +1,46 @@
+{
+  "tools": [
+    {
+      "name": "oneinvest_get_asset_stats",
+      "description": "Thống kê giá BĐS theo phường/thị trường Việt Nam: median giá bán, giá/m², thuê dài hạn. Nguồn: tin rao cộng đồng (S03) + tự thu (S01), pseudonymized theo SPL.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "area": {
+            "type": "string",
+            "description": "Area ID (vd: vn-hanoi-ba-dinh) — stats cho một phường"
+          },
+          "market": {
+            "type": "string",
+            "description": "Market ID (vd: vn-hanoi) — stats cho tất cả phường con"
+          }
+        },
+        "oneOf": [
+          { "required": ["area"] },
+          { "required": ["market"] }
+        ]
+      },
+      "endpoint": "/api/v1/asset-stats",
+      "method": "GET"
+    },
+    {
+      "name": "oneinvest_get_offers",
+      "description": "Danh sách tin bán/cho thuê BĐS gần đây, lọc theo phường/loại/thời gian. Kèm confidence + source code SPL.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "kind": { "type": "string", "enum": ["sale", "rent_lt"], "default": "sale" },
+          "area": { "type": "string", "description": "Area ID filter" },
+          "limit": { "type": "integer", "default": 50, "maximum": 200 },
+          "since_days": { "type": "integer", "default": 30, "maximum": 365 }
+        }
+      },
+      "endpoint": "/api/v1/offers",
+      "method": "GET"
+    }
+  ],
+  "base_url": "http://localhost:3000",
+  "cloud_base_url": "https://app-lilac-one-49.vercel.app",
+  "auth": "public (đã pseudonymize theo SPL ADR-0007)",
+  "updated": "2026-10-20"
+}

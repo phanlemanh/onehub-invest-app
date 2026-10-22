@@ -15,6 +15,7 @@ import {
   getZaloGroups,
 } from "@/lib/collections-queries";
 import { fmtInt } from "@/lib/format";
+import { getSourceFeedHealth, getLockdownStatus } from "@/lib/ops-queries";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Thu thập" };
@@ -42,7 +43,7 @@ function Stat({
  * Trả lời 3 câu: hôm nay chảy vào gì / qua cổng nào / máy có chạy không.
  */
 export default async function CollectionsPage() {
-  const [days, funnel, jobs, rotation, zaloGroups, zaloAllowlist, zaloHealth, factsPushedAt] = await Promise.all([
+  const [days, funnel, jobs, rotation, zaloGroups, zaloAllowlist, zaloHealth, factsPushedAt, feedHealth, lockdown] = await Promise.all([
     getFlowDays(7),
     readGateFunnel(),
     readSchedulerStatus(),
@@ -51,6 +52,8 @@ export default async function CollectionsPage() {
     readZaloAllowlist(),
     readZaloHealth(),
     getFactsPushedAt(),
+    getSourceFeedHealth(),
+    getLockdownStatus(),
   ]);
   const today = days[0];
   const factsAgeMin = factsPushedAt
@@ -65,6 +68,85 @@ export default async function CollectionsPage() {
           Dòng chảy dữ liệu vào hệ thống theo nguồn và theo ngày — cho ra quyết
           định thu thập mà không phải mở log tay.
         </p>
+
+      {/* H3-P1: Sức khoẻ nguồn — liếc một phát biết kênh nào sống/chết/trễ SLO */}
+      <section className="flex flex-col gap-2">
+        <h2 className="text-sm font-medium">Sức khỏe nguồn</h2>
+        <div className="overflow-x-auto rounded-lg border">
+          <table className="w-full text-xs">
+            <thead>
+              <tr className="text-muted-foreground border-b bg-muted/30 text-left">
+                <th className="px-3 py-2 font-medium">Nguồn</th>
+                <th className="px-2 py-2 font-medium">Trạng thái</th>
+                <th className="px-2 py-2 font-medium">Chạy cuối</th>
+                <th className="px-2 py-2 font-medium">Độ tươi</th>
+                <th className="px-2 py-2 font-medium">24h</th>
+                <th className="px-2 py-2 font-medium">Staging</th>
+                <th className="px-3 py-2 font-medium">Offers</th>
+              </tr>
+            </thead>
+            <tbody>
+              {feedHealth.map((f) => {
+                const overdue = f.sloHours && f.freshnessHrs !== null && f.freshnessHrs > f.sloHours;
+                const dead = f.status !== "active";
+                return (
+                  <tr key={f.code} className="border-b last:border-0">
+                    <td className="px-3 py-2">
+                      <span className="font-mono">{f.code}</span> {f.labelVi}
+                    </td>
+                    <td className="px-2 py-2">
+                      <Badge variant={dead ? "outline" : overdue ? "warning-light" : "success-light"}>
+                        {dead ? f.status : overdue ? "trễ SLO" : "ok"}
+                      </Badge>
+                    </td>
+                    <td className="text-muted-foreground px-2 py-2">
+                      {f.lastRunAt ? new Date(f.lastRunAt).toLocaleString("vi-VN") : "—"}
+                    </td>
+                    <td className="px-2 py-2 tabular-nums">
+                      {f.freshnessHrs === null ? "—" : `${f.freshnessHrs}h`}
+                      {f.sloHours ? <span className="text-muted-foreground"> /{f.sloHours}h</span> : ""}
+                    </td>
+                    <td className="px-2 py-2 tabular-nums">{f.items24h || "—"}</td>
+                    <td className="px-2 py-2 tabular-nums">{f.stgRows || "—"}</td>
+                    <td className="px-3 py-2 tabular-nums">{f.offers ?? "—"}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      {/* H3-P2: Lockdown — sau 2 sự cố, an toàn phải hữu hình */}
+      <section className="flex flex-col gap-2">
+        <div className="flex items-baseline justify-between">
+          <h2 className="text-sm font-medium">Lockdown &amp; hạ tầng thu</h2>
+          <span className="text-muted-foreground text-[11px]">
+            watchdog: {lockdown.lastWatchdogAt ?? "—"} · agent-turn hôm nay:{" "}
+            <span className={lockdown.agentTurnsToday > 0 ? "font-semibold text-destructive" : ""}>
+              {lockdown.agentTurnsToday}
+            </span>
+          </span>
+        </div>
+        <div className="grid grid-cols-2 gap-1.5 md:grid-cols-4">
+          {lockdown.layers.map((l) => (
+            <div
+              key={l.layer + l.desc}
+              className="flex items-center gap-2 rounded-md border px-2.5 py-1.5 text-xs"
+            >
+              <span
+                className={`h-2 w-2 shrink-0 rounded-full ${
+                  l.ok === true ? "bg-emerald-500" : l.ok === false ? "bg-red-500" : "bg-muted-foreground/40"
+                }`}
+              />
+              <span className="truncate" title={l.desc}>
+                <span className="text-muted-foreground">{l.layer}</span> {l.desc}
+              </span>
+            </div>
+          ))}
+        </div>
+      </section>
+
         {factsPushedAt && (
           <Badge variant={factsAgeMin !== null && factsAgeMin > 30 ? "warning-light" : "outline"}>
             Dữ liệu máy thu — cập nhật {factsAgeMin !== null ? `${factsAgeMin} phút` : ""} trước
